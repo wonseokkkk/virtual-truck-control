@@ -59,6 +59,14 @@ def generate_launch_description():
             executable='lane_detect_node',
             output='screen',
             parameters = [lane_param_file])
+    
+    lane_keeping_node=Node(
+            package='lane_keeping',
+            namespace='LV',
+            name='LaneKeeping', # .yaml에 명시.
+            executable='lane_keeping_node',
+            output='screen',
+            parameters = [lane_param_file])
 
     control_node=Node(
             package='scale_truck_control_ros2', 
@@ -88,6 +96,7 @@ def generate_launch_description():
     
  
     ld.add_action(lane_detection_node)
+    ld.add_action(lane_keeping_node)
     ld.add_action(object_node)
     ld.add_action(control_node)
     ld.add_action(lrc_node)

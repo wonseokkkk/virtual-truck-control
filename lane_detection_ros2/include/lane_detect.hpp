@@ -91,7 +91,7 @@ private:
   Mat drawBox(Mat frame);
   void controlSteer();
   void clear_release();
-  tk::spline cspline();
+
   cv::Point2f transformPoint(const cv::Point& pt, const cv::Mat& camera_matrix, const cv::Mat& dist_coeffs); 
 
   //Publisher
@@ -100,12 +100,10 @@ private:
   //Subscriber
   rclcpp::Subscription<ros2_msg::msg::Xav2lane>::SharedPtr XavSubscriber_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr ImageSubscriber_;
-  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr rearImageSubscriber_;
 
   //Callback Func
   void XavSubCallback(const ros2_msg::msg::Xav2lane::SharedPtr msg);
   void ImageSubCallback(const sensor_msgs::msg::Image::SharedPtr msg);
-  void rearImageSubCallback(const sensor_msgs::msg::Image::SharedPtr msg);
 
   bool viewImage_;
   int waitKeyDelay_;
@@ -172,29 +170,7 @@ private:
   int last_Elane_base_;
   int last_E2lane_base_;
 
-  vector<int> left_lane_inds_;
-  vector<int> right_lane_inds_;
-  vector<int> extra_lane_inds_;
-  vector<int> left_x_;
-  vector<int> left_y_;
-  vector<int> right_x_;
-  vector<int> right_y_;
-  vector<int> extra_x_;
-  vector<int> extra_y_;
-  vector<int> extra2_x_;
-  vector<int> extra2_y_;
-  vector<int> center_x_;
-  vector<int> center_y_;
-  vector<int> center2_x_;
-  vector<int> center2_y_;
-  vector<int> center3_x_;
-  vector<int> center3_y_;
-  
-  int mark_;
-
-  vector<Point> left_lane_, right_lane_, extra_lane_, extra2_lane;
-
-  Mat left_coef_;
+  vector<int> left_coef_;
   Mat right_coef_;
   Mat extra_coef_;
   Mat extra2_coef_;
