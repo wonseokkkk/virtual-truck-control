@@ -389,14 +389,6 @@ void ScaleTruckController::LaneSubCallback(const ros2_msg::msg::Lane2xav::Shared
   {
     std::scoped_lock lock(lane_mutex_);
     lane_coef_.coef = msg->coef;
-    AngleDegree = msg->cur_angle;
-    AngleDegree2 = msg->cur_angle2;
-    center_select_ = msg->center_select;
-    lc_center_follow_ = msg->lc_center_follow;
-    e_values_ = msg->e_values;
-    K1_ = msg->k1;
-    K2_ = msg->k2;
-
   }
 }
 

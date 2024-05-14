@@ -17,7 +17,6 @@ find_package(cv_bridge REQUIRED)
 find_package(ros2_msg REQUIRED)
 
 set(PROJECT_SOURCES
-  src/main.cpp
   src/lane_detect.cpp
 
   include/lane_detect.hpp

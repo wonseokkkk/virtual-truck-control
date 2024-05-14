@@ -84,11 +84,11 @@ def generate_launch_description():
             parameters = [ros_param_file, {"LrcParams/lrc_index" : 10}],
             output='screen')
 
-    speed_control_node=Node(
-            package='speed_control', 
+    vehicle_control_node=Node(
+            package='vehicle_control', 
             namespace='LV', 
-            name='speed_control', 
-            executable='talker', 
+            name='vehicle_control', 
+            executable='vehicle_control_node', 
             output='screen')
 
 
@@ -96,11 +96,10 @@ def generate_launch_description():
     
  
     ld.add_action(lane_detection_node)
-    ld.add_action(lane_keeping_node)
     ld.add_action(object_node)
     ld.add_action(control_node)
     ld.add_action(lrc_node)
-    ld.add_action(speed_control_node)
+    ld.add_action(vehicle_control_node)
     return ld
 
 

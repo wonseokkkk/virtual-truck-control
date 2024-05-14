@@ -39,9 +39,6 @@ LaneKeeping::LaneKeeping()
   SteerPublisher_ = this->create_publisher<std_msgs::msg::Float32>("steer",XavPubQueueSize);
 
   /********** PID control ***********/
-//  left_coef_ = Mat::zeros(3, 1, CV_32F);
-//  right_coef_ = Mat::zeros(3, 1, CV_32F);
-//  center_coef_ = Mat::zeros(3, 1, CV_32F);
 
   lane_coef_.coef.resize(3);
   poly_coef_.coef.resize(3);

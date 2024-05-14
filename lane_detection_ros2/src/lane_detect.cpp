@@ -1073,3 +1073,12 @@ float LaneDetector::display_img(Mat _frame, int _delay, bool _view) {
 }
 
 } /* namespace lane_detect */
+
+int main(int argc, char* argv[]){
+    rclcpp::init(argc, argv);
+    std::shared_ptr<rclcpp::Node> node = std::make_shared<LaneDetect::LaneDetector>();
+    rclcpp::spin(node);
+    rclcpp::shutdown();
+    return 0;
+}
+

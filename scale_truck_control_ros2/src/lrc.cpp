@@ -75,7 +75,7 @@ void LocalRC::init(){
   XavPublisher_ = this->create_publisher<ros2_msg::msg::Lrc2xav>(XavPubTopicName, XavPubQueueSize);  
   OcrPublisher_ = this->create_publisher<ros2_msg::msg::Lrc2ocr>(OcrPubTopicName, OcrPubQueueSize);
   if (index_ == 10) {
-    FVPublisher_ = this->create_publisher<ros2_msg::msg::Lrc2xav>(FVPubTopicName, FVPubQueueSize);
+  FVPublisher_ = this->create_publisher<ros2_msg::msg::Lrc2xav>(FVPubTopicName, FVPubQueueSize);
   }
 
   /*********************/
