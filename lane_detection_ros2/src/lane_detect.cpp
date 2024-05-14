@@ -46,18 +46,16 @@ LaneDetector::LaneDetector()
   /* Ros Topic Publisher */
   /***********************/
   XavPublisher_ = this->create_publisher<ros2_msg::msg::Lane2xav>(XavPubTopicName, XavPubQueueSize);
-//  SteerPublisher_ = this->create_publisher<std_msgs::msg::Float32>("steer",XavPubQueueSize);
   /***************/
   /* View Option */
   /***************/
   this->get_parameter_or("image_view/enable_opencv", viewImage_, true);
   this->get_parameter_or("image_view/wait_key_delay", waitKeyDelay_, 3);
-  this->get_parameter_or("image_view/TEST", TEST, false);
 
   /******* recording log *******/    
   gettimeofday(&start_, NULL);
 
-      /******* Camera  calibration *******/
+  /******* Camera  calibration *******/
   double f_matrix[9], f_dist_coef[5], r_matrix[9], r_dist_coef[5];
   this->get_parameter_or("Calibration/f_matrix/a",f_matrix[0], 3.2918100682757097e+02);
   this->get_parameter_or("Calibration/f_matrix/b",f_matrix[1], 0.);
@@ -86,25 +84,11 @@ LaneDetector::LaneDetector()
 
   map1_ = f_map1_.clone();
   map2_ = f_map2_.clone();
-int width = 640;   // 이미지 너비
-int height = 480;  // 이미지 높이
-
-  /********** PID control ***********/
-  prev_err_ = 0;
-
-  last_Llane_base_ = 0;
-  last_Rlane_base_ = 0;
-  left_coef_ = Mat::zeros(3, 1, CV_32F);
-  right_coef_ = Mat::zeros(3, 1, CV_32F);
-  center_coef_ = Mat::zeros(3, 1, CV_32F);
-  center2_coef_ = Mat::zeros(3, 1, CV_32F);
-  center3_coef_ = Mat::zeros(3, 1, CV_32F);
-  extra_coef_ = Mat::zeros(3, 1, CV_32F);
-  extra2_coef_ = Mat::zeros(3, 1, CV_32F);
+  int width = 640;   // image width 
+  int height = 480;  // image height
 
   this->get_parameter_or("ROI/width", width_, 640);
   this->get_parameter_or("ROI/height", height_, 480);
-  center_position_ = width_/2;
 
   float t_gap[5], b_gap[5], t_height[5], b_height[5], f_extra[5], b_extra[5];
   int top_gap[5], bot_gap[5], top_height[5], bot_height[5], extra_up[5], extra_down[5];
@@ -112,8 +96,6 @@ int height = 480;  // 이미지 높이
 
   this->get_parameter_or("ROI/dynamic_roi",option_, true);
   this->get_parameter_or("ROI/threshold",threshold_, 128);
-  this->get_parameter_or("ROI/frontRoi_ratio",frontRoi_ratio, 204.0f);
-  this->get_parameter_or("ROI/rearRoi_ratio",rearRoi_ratio, 210.0f);
 
   this->get_parameter_or("ROI/front_cam/top_gap",t_gap[0], 0.336f);
   this->get_parameter_or("ROI/front_cam/bot_gap",b_gap[0], 0.078f);
@@ -130,11 +112,6 @@ int height = 480;  // 이미지 높이
 
   corners_.resize(4);
   warpCorners_.resize(4);
-
-  test_corners_.resize(4);
-  test_warpCorners_.resize(4);
-
-  e_values_.resize(3);
 
   /*** front cam ROI setting ***/
   fROIcorners_.resize(4);
@@ -161,33 +138,6 @@ int height = 480;  // 이미지 높이
 
   /*  Synchronisation         */
   cam_new_frame_arrived = false;
-  rear_cam_new_frame_arrived = false;
-
-  /* Lateral Control coefficient */
-  this->get_parameter_or("params/K", K_, 0.15f);
-  this->get_parameter_or("params/K3", K3_, 0.15f);
-  this->get_parameter_or("params/K4", K4_, 0.15f);
-
-  this->get_parameter_or("params/a/a", a_[0], 0.);
-  this->get_parameter_or("params/a/b", a_[1], -0.37169);
-  this->get_parameter_or("params/a/c", a_[2], 1.2602);
-  this->get_parameter_or("params/a/d", a_[3], -1.5161);
-  this->get_parameter_or("params/a/e", a_[4], 0.70696);
-
-  this->get_parameter_or("params/b/a", b_[0], 0.);
-  this->get_parameter_or("params/b/b", b_[1], -1.7536);
-  this->get_parameter_or("params/b/c", b_[2], 5.0931);
-  this->get_parameter_or("params/b/d", b_[3], -4.9047);
-  this->get_parameter_or("params/b/e", b_[4], 1.6722);
-
-  this->get_parameter_or("params/a2/a", a2_[0], 0.5);
-  this->get_parameter_or("params/a2/b", a2_[1], -0.95);
-  this->get_parameter_or("params/a2/c", a2_[2], 0.52);
-
-  this->get_parameter_or("params/b2/a", b2_[0], -0.0875);
-  this->get_parameter_or("params/b2/b", b2_[1], 0.0575);
-  this->get_parameter_or("params/b2/c", b2_[2], 0.17);
-  LoadParams();
 
   isNodeRunning_ = true;
   lanedetect_Thread = std::thread(&LaneDetector::lanedetectInThread, this);
@@ -200,16 +150,14 @@ LaneDetector::~LaneDetector(void)
 
   /*  Unblock the other thread to shutdown the programm smoothly  */
   cam_new_frame_arrived = true;
-  rear_cam_new_frame_arrived = true;
   cam_condition_variable.notify_one();
-  rear_cam_condition_variable.notify_one();
 
   ros2_msg::msg::Lane2xav xav;
   xav.coef = lane_coef_.coef;
-  xav.cur_angle = AngleDegree_;
-  xav.cur_angle2 = SteerAngle2_;
-  xav.e_values = e_values_;
 
+//  xav.coef[0] = left_coef_.coef;
+//  xav.coef[1] = right_coef_.coef;
+//  xav.coef[2] = center_coef_.coef;
   XavPublisher_->publish(xav);
   lanedetect_Thread.join();
 
@@ -223,11 +171,10 @@ void LaneDetector::lanedetectInThread()
   int cnt = 0;
   const auto wait_duration = std::chrono::milliseconds(2000);
 
-  while(!imageStatus_ && !rearImageStatus_) {
-
+  while(!imageStatus_) {
     /*  Synchronize at startup  */
       unique_lock<mutex> lock(cam_mutex);
-      if(cam_condition_variable.wait_for(lock, wait_duration, [this] { return (imageStatus_ && !rearImageStatus_); } )) {
+      if(cam_condition_variable.wait_for(lock, wait_duration, [this] { return (imageStatus_); } )) {
         /*  Startup done! We are ready to start */
         RCLCPP_INFO(this->get_logger(), "First image arrived.\n");
         break;
@@ -241,7 +188,6 @@ void LaneDetector::lanedetectInThread()
   }
 
   ros2_msg::msg::Lane2xav xav;
-  std_msgs::msg::Float32 steer_;
   while(!controlDone_ && rclcpp::ok()) 
   {
     struct timeval start_time, end_time, cur_time;
@@ -255,40 +201,10 @@ void LaneDetector::lanedetectInThread()
         cam_condition_variable.wait(lock, [this] { return cam_new_frame_arrived; } );
         cam_new_frame_arrived = false;
       }
-      AngleDegree_ = display_img(camImageCopy_, waitKeyDelay_, viewImage_);
+      display_img(camImageCopy_, waitKeyDelay_, viewImage_);
       droi_ready_ = false;
-     
-      xav.coef = lane_coef_.coef;
-      xav.cur_angle = AngleDegree_;
-      if (wroi_flag_) xav.cur_angle2 = SteerAngle2_;
-      else xav.cur_angle2 = AngleDegree_;
-      xav.wroi_flag = wroi_flag_;
-      xav.center_select = center_select_;
-      xav.e_values = e_values_;
-      xav.k1 = K1_;
-      xav.k2 = K2_;
-      xav.lc_center_follow = lc_center_follow_;
-      xav.est_dist = est_dist_;
-      xav.est_vel = est_vel_;
-      steer_.data = AngleDegree_;
-//      SteerPublisher_->publish(steer_);
-      XavPublisher_->publish(xav);
-    }
-    else if(rearImageStatus_) { /* use rear_cam  */ 
-
-      /*  Synchronize ImageSubCallback and this thread  */
-      {
-        unique_lock<mutex> lock(rear_cam_mutex);
-        rear_cam_condition_variable.wait(lock, [this] { return rear_cam_new_frame_arrived; } );
-        rear_cam_new_frame_arrived = false;
-      }
-
-      AngleDegree_ = display_img(rearCamImageCopy_, waitKeyDelay_, viewImage_);
-     
-      xav.coef = lane_coef_.coef;
-      xav.center_select = center_select_;
-      xav.est_dist = est_dist_;
-      xav.est_vel = est_vel_;
+    
+      xav.coef = lane_coef_.coef; 
       XavPublisher_->publish(xav);
     }
 
@@ -312,16 +228,6 @@ void LaneDetector::lanedetectInThread()
   }
 }
 
-void LaneDetector::LoadParams(void)
-{
-  this->get_parameter_or("LaneDetector/eL_height",eL_height_, 1.0f);  
-  this->get_parameter_or("LaneDetector/e1_height",e1_height_, 1.0f);  
-  this->get_parameter_or("LaneDetector/trust_height",trust_height_, 1.0f);  
-  this->get_parameter_or("LaneDetector/lp",lp_, 756.0f);  
-  this->get_parameter_or("LaneDetector/steer_angle",SteerAngle_, 0.0f);
-  this->get_parameter_or("LaneDetector/steer_angle2",SteerAngle2_, 0.0f);
-}
-
 cv::Point2f LaneDetector::transformPoint(const cv::Point& pt, const cv::Mat& camera_matrix, const cv::Mat& dist_coeffs) {
     std::vector<cv::Point2f> srcPoints = { cv::Point2f(pt.x, pt.y) }; // 정수형 좌표를 부동소수점으로 변환
     std::vector<cv::Point2f> dstPoints;
@@ -338,23 +244,11 @@ cv::Point2f LaneDetector::transformPoint(const cv::Point& pt, const cv::Mat& cam
 void LaneDetector::XavSubCallback(const ros2_msg::msg::Xav2lane::SharedPtr msg)
 {
   if(imageStatus_) {
-    cur_vel_ = msg->cur_vel;
     distance_ = msg->cur_dist; // for ICRA
     droi_ready_ = true;
-  
-    get_steer_coef(cur_vel_);
-  
-    lc_right_flag = msg->lc_right_flag;
-    lc_left_flag = msg->lc_left_flag;
 
     cv::Point2f topLeft = transformPoint(cv::Point(msg->x, msg->y), f_camera_matrix, f_dist_coeffs);
     cv::Point2f bottomRight = transformPoint(cv::Point(msg->x + msg->w, msg->y + msg->h), f_camera_matrix, f_dist_coeffs);
-
-    name_ = msg->name;
-    x_ = static_cast<int>(topLeft.x);
-    y_ = static_cast<int>(topLeft.y);
-    w_ = static_cast<int>(bottomRight.x - topLeft.x);
-    h_ = static_cast<int>(bottomRight.y - topLeft.y);
   }
 }
 
@@ -483,8 +377,6 @@ std::vector<int> LaneDetector::clusterHistogram(int* hist, int cluster_num) {
   for (const auto& cluster : clusters_info) {
     result.push_back(cluster.maxValueIndex);
   }
-
-
 
   return result;
 }
@@ -880,18 +772,6 @@ float LaneDetector::lowPassFilter(double sampling_time, float est_value, float p
   return res;
 }
 
-float LaneDetector::lowPassFilter2(double sampling_time, float est_value, float prev_res){
-  float res = 0;
-  float tau = 0.5f; 
-  double st = 0.0;
-
-  if (sampling_time > 1.0) st = 1.0;
-  else st = sampling_time;
-  res = ((tau * prev_res) + (st * est_value)) / (tau + st);
-
-  return res;
-}
-
 Point LaneDetector::warpPoint(Point center, Mat trans){
   Point warp_center, avg_center;
 
@@ -902,7 +782,7 @@ Point LaneDetector::warpPoint(Point center, Mat trans){
 }
 
 Mat LaneDetector::draw_lane(Mat _sliding_frame, Mat _frame) {
-  Mat new_frame, left_coef(left_coef_), right_coef(right_coef_), extra_coef(extra_coef_), extra2_coef(extra2_coef_), center_coef(center_coef_), center2_coef(center2_coef_), center3_coef(center3_coef_), trans;
+  Mat new_frame, left_coef(left_coef_), right_coef(right_coef_), center_coef(center_coef_), trans;
 
   static struct timeval endTime, startTime;
   static bool flag;
@@ -1056,11 +936,7 @@ Mat LaneDetector::draw_lane(Mat _sliding_frame, Mat _frame) {
       
       droi_points.push_back(temp_droi_point);
       
-      if(imageStatus_ && TEST) {
-        temp_roi_point.x = (int)test_corners_[roi_num[i]].x;
-        temp_roi_point.y = (int)test_corners_[roi_num[i]].y;
-      }
-      else {
+      if(imageStatus_) {
         temp_roi_point.x = (int)corners_[roi_num[i]].x;
         temp_roi_point.y = (int)corners_[roi_num[i]].y;
       }
@@ -1100,36 +976,11 @@ void LaneDetector::clear_release() {
   center_y_.clear();
 }
 
-void LaneDetector::get_steer_coef(float vel){
-  float value;
-  if (vel > 1.2f)
-    value = 1.2f;
-  else
-    value = vel;
-
-  if (value < 0.65f){
-    K1_ = K2_ =  K_;
-  }
-  else{
-    K1_ = (a_[0] * pow(value, 4)) + (a_[1] * pow(value, 3)) + (a_[2] * pow(value, 2)) + (a_[3] * value) + a_[4];
-    K2_ = (b_[0] * pow(value, 4)) + (b_[1] * pow(value, 3)) + (b_[2] * pow(value, 2)) + (b_[3] * value) + b_[4];
-  }
-  
-}
-
-void LaneDetector::controlSteer() {
-  Mat l_fit(left_coef_), r_fit(right_coef_), c_fit(center_coef_), e_fit(extra_coef_), e2_fit(extra2_coef_), c2_fit(center2_coef_), c3_fit(center3_coef_);
-  float car_position = width_ / 2;
-  float l1 = 0.0f, l2 = 0.0f, l3 = 0.0f;
-  float i = ((float)height_) * eL_height_;  
-  float j = ((float)height_) * trust_height_;
-  float k = ((float)height_) * e1_height_;
-  float temp_diff = 10.1f;
-  static int wroi_cnt_ = 0;
+void LaneDetector::get_lane_coef() {
+  Mat l_fit(left_coef_), r_fit(right_coef_), c_fit(center_coef_);
 
   lane_coef_.coef.resize(3);
   if (!l_fit.empty() && !r_fit.empty()) {
-
     lane_coef_.coef[0].a = l_fit.at<float>(2, 0);
     lane_coef_.coef[0].b = l_fit.at<float>(1, 0);
     lane_coef_.coef[0].c = l_fit.at<float>(0, 0);
@@ -1141,103 +992,13 @@ void LaneDetector::controlSteer() {
     lane_coef_.coef[2].a = c_fit.at<float>(2, 0);
     lane_coef_.coef[2].b = c_fit.at<float>(1, 0);
     lane_coef_.coef[2].c = c_fit.at<float>(0, 0);
-
-    l1 =  j - i;
-    l2 = ((lane_coef_.coef[2].a * pow(i, 2)) + (lane_coef_.coef[2].b * i) + lane_coef_.coef[2].c) - ((lane_coef_.coef[2].a * pow(j, 2)) + (lane_coef_.coef[2].b * j) + lane_coef_.coef[2].c);
-
-    e_values_[0] = ((lane_coef_.coef[2].a * pow(i, 2)) + (lane_coef_.coef[2].b * i) + lane_coef_.coef[2].c) - car_position;  //eL
-    e_values_[1] = e_values_[0] - (lp_ * (l2 / l1));  //trust_e1
-    e_values_[2] = ((lane_coef_.coef[2].a * pow(k, 2)) + (lane_coef_.coef[2].b * k) + lane_coef_.coef[2].c) - car_position;  //e1
-    SteerAngle_ = ((-1.0f * K1_) * e_values_[1]) + ((-1.0f * K2_) * e_values_[0]);
-    cout << SteerAngle_ << '\n';
   }
-
-  
-}
-
-
-Mat LaneDetector::drawBox(Mat frame)
-{
-  std::string name;
-  Scalar color;
-  int x, y, w, h;
-
-  if(imageStatus_) {
-    name = name_;
-    x = x_;
-    y = y_;
-    w = w_;
-    h = h_;
-  }
-
-  if (name == "SV1") color = cv::Scalar(255, 0, 255);
-  else if (name == "SV2") color = cv::Scalar(55, 200, 55);
-
-  Size text_size = getTextSize(name, FONT_HERSHEY_COMPLEX_SMALL, 1.2, 2, 0);
-  int max_width = (text_size.width > w + 2) ? text_size.width : (w + 2);
-  max_width = max(max_width, (int)w + 2);
-  rectangle(frame, Rect(x, y, w, h), color, 2);
-  rectangle(frame, Point2f(max((int)x - 1, 0), max((int)y - 35, 0)), Point2f(min((int)x + max_width, frame.cols - 1), min((int)y, frame.rows - 1)), color, -1, 8, 0);
-  putText(frame, name, Point2f(x, y-16), FONT_HERSHEY_COMPLEX_SMALL, 1.2, Scalar(0,0,0), 2);
-  return frame;
-}
-
-Mat LaneDetector::estimateDistance(Mat frame, Mat trans, double cycle_time, bool _view){
-  Mat res_frame;
-  Point warp_center;
-  static Point prev_warp_center;
-  int dist_pixel = 0;
-  float est_dist = 0.f, original_est_vel = 0.f;
-  static float prev_dist = 0.f, prev_est_vel = 0.f;
-
-  frame.copyTo(res_frame);
-  if(imageStatus_) center_ = Point((x_ + w_ / 2), (y_ + h_)); // front-cam yolo
-  else center_ = Point(rx_ + rw_ / 2, ry_ + rh_); // rear-cam yolo 
-  warp_center = warpPoint(center_, trans);
-  warp_center.x = lowPassFilter(cycle_time, warp_center.x, prev_warp_center.x);
-  warp_center.y = lowPassFilter(cycle_time, warp_center.y, prev_warp_center.y);
-  prev_warp_center = warp_center;
-  warp_center_ = warp_center;
-  dist_pixel = warp_center.y;
-
-  if (imageStatus_){
-    est_dist = 2.50f - (dist_pixel/frontRoi_ratio); //front camera
-    if (est_dist > 0.30f && est_dist < 2.50f) {
-      est_dist_ = est_dist;
-    }
-    else 
-      est_dist_ = 0.0f;
-  }
-  else{
-    est_dist = 2.50f - (dist_pixel/rearRoi_ratio); //rear camera
-    if (est_dist > 0.30f && est_dist < 2.50f) {
-      est_dist_ = est_dist;
-    }
-    else 
-      est_dist_ = 0.0f;
-  }
-
-  if (prev_dist == 0){
-    prev_dist = est_dist_;
-  } 
-
-  if (est_dist_ != 0) {
-    est_dist_ = lowPassFilter(cycle_time, est_dist_, prev_dist);
-    original_est_vel = ((prev_dist - est_dist_) / cycle_time) + cur_vel_;
-    est_vel_ = lowPassFilter2(cycle_time, original_est_vel, prev_est_vel);
-
-    prev_est_vel = est_vel_;
-    prev_dist = est_dist_; 
-  }
-
-  return res_frame;
 }
 
 float LaneDetector::display_img(Mat _frame, int _delay, bool _view) {   
-  Mat test_trans, new_frame, gray_frame, binary_frame, overlap_frame, sliding_frame, resized_frame, warped_frame;
+  Mat new_frame, gray_frame, binary_frame, overlap_frame, sliding_frame, resized_frame, warped_frame;
   static struct timeval startTime, endTime;
   static bool flag = false;
-  static bool lc_flag = false;
   double diffTime = 0.0;
   
   /* apply ROI setting */
@@ -1246,15 +1007,9 @@ float LaneDetector::display_img(Mat _frame, int _delay, bool _view) {
     std::copy(fROIwarpCorners_.begin(), fROIwarpCorners_.end(), warpCorners_.begin());
     lc_right_flag_ = false; 
     lc_left_flag_ = false; 
-    lc_center_follow_ = true;
   }
 
   Mat trans = getPerspectiveTransform(corners_, warpCorners_);
-
-  //For Estimation ROI
-  std::copy(testROIcorners_.begin(), testROIcorners_.end(), test_corners_.begin());
-  std::copy(testROIwarpCorners_.begin(), testROIwarpCorners_.end(), test_warpCorners_.begin());
-  test_trans = getPerspectiveTransform(test_corners_, test_warpCorners_);
 
   /* End apply ROI setting */
   if (!_frame.empty())
@@ -1268,9 +1023,7 @@ float LaneDetector::display_img(Mat _frame, int _delay, bool _view) {
   remap(new_frame, remap_frame, map1, map2, INTER_LINEAR);
   
 //  cv::Mat warped_frame;
-  if (imageStatus_ && TEST) { // For view TEST ROI
-      warpPerspective(remap_frame, warped_frame, test_trans, Size(width_, height_));
-  } else {
+  if (imageStatus_) { // For view TEST ROI
       warpPerspective(remap_frame, warped_frame, trans, Size(width_, height_));
   }
   
@@ -1290,39 +1043,8 @@ float LaneDetector::display_img(Mat _frame, int _delay, bool _view) {
   /* adaptive Threshold */
   adaptiveThreshold(gray_frame, binary_frame, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, Threshold_box_size_, -(Threshold_box_offset_));
 
-  /* estimate Distance */
-  if ((((x_ > 0 && x_ < 640) && \
-          (y_ > 0 && y_ < 480) && \
-          (w_ > 0 && w_ < 640) && \
-          (h_ > 0 && h_ < 480))) || \
-      (((rx_ > 0 && rx_ < 640) && \
-        (ry_ > 0 && ry_ < 480) && \
-        (rw_ > 0 && rw_ < 640) && \
-        (rh_ > 0 && rh_ < 480)))) 
-  {
-    gettimeofday(&endTime, NULL);
-    if (!flag){
-      diffTime = (endTime.tv_sec - start_.tv_sec) + (endTime.tv_usec - start_.tv_usec)/1000000.0;
-      flag = true;
-    }
-    else{
-      diffTime = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_usec - startTime.tv_usec)/1000000.0;
-      startTime = endTime;
-    }
-    if (imageStatus_) sliding_frame = estimateDistance(sliding_frame, test_trans, diffTime, _view);
-
-    if(imageStatus_ && est_dist_ != 0) {
-      //distance_ = (int)((2.50f - est_dist_)*frontRoi_ratio); // FOR ICRA
-    }
-  }
-  else {
-//    est_dist_ = 0.0f; // box튀면 값이 0됨 (LPF로 처리도 안됨) 
-//    est_vel_ = 0.0f;
-  }
-
   sliding_frame = detect_lines_sliding_window(binary_frame, _view);
-  controlSteer();
-
+  get_lane_coef();
   if (_view) {
     resized_frame = draw_lane(sliding_frame, new_frame);
     namedWindow("Window1");
@@ -1335,12 +1057,9 @@ float LaneDetector::display_img(Mat _frame, int _delay, bool _view) {
     moveWindow("Histogram Clusters", 710, 700);
 
     if(!new_frame.empty()) {
-      if(TEST) cv::circle(new_frame, center_, 10, (0,0,255), -1);
-      new_frame = drawBox(new_frame);
       imshow("Window1", new_frame);
     }
     if(!sliding_frame.empty()) {
-      if(TEST) cv::circle(sliding_frame, warp_center_, 10, (0,0,255), -1);
       imshow("Window2", sliding_frame);
     }
     if(!resized_frame.empty()){
@@ -1351,10 +1070,6 @@ float LaneDetector::display_img(Mat _frame, int _delay, bool _view) {
   }
   clear_release();
 
-
-  
-
-  return SteerAngle_;
 }
 
 } /* namespace lane_detect */

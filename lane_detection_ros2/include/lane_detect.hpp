@@ -22,20 +22,12 @@
 #include "std_msgs/msg/header.hpp"
 
 #include <opencv2/opencv.hpp>
-//#include <opencv2/highgui/highgui.hpp>
-//#include <opencv2/cudaarithm.hpp>
-//#include <opencv2/cudafeatures2d.hpp>
-//#include <opencv2/core/cuda.hpp>
-//#include <opencv2/cudaimgproc.hpp>
-//#include <opencv2/cudawarping.hpp>
-//#include <opencv2/cudafilters.hpp>
 
 //ROS2
 #include "rclcpp/rclcpp.hpp"
 #include "ros2_msg/msg/xav2lane.hpp"
 #include "ros2_msg/msg/lane2xav.hpp"
 #include "std_msgs/msg/float32.hpp"
-#include "spline.h"
 
 #define _GUN_SOURCE
 
@@ -55,12 +47,7 @@ public:
   struct timeval start_, end_;
 
   float display_img(Mat _frame, int _delay, bool _view);
-  void get_steer_coef(float vel);
-  float K1_, K2_, K3_, K4_;
   int distance_ = 0;
-  float cur_vel_ = 0.0f;
-  float est_dist_ = 0.0f;
-  float est_vel_ = 0.0f;
   Mat frame_;
   float rotation_angle_ = 0.0f;
   float lateral_offset_ = 0.0f;
@@ -77,6 +64,9 @@ public:
   float log_el_ = 0.0f;
   float vel_ = 0.0f;
 
+  Mat left_coef_;
+  Mat right_coef_;
+  Mat center_coef_;
 private:
   void LoadParams(void);
   int arrMaxIdx(int hist[], int start, int end, int Max);
@@ -89,7 +79,7 @@ private:
   Mat estimateDistance(Mat frame, Mat trans, double cycle_time, bool _view);
   Mat draw_lane(Mat _sliding_frame, Mat _frame);
   Mat drawBox(Mat frame);
-  void controlSteer();
+  void get_lane_coef();
   void clear_release();
 
   cv::Point2f transformPoint(const cv::Point& pt, const cv::Mat& camera_matrix, const cv::Mat& dist_coeffs); 
@@ -170,13 +160,6 @@ private:
   int last_Elane_base_;
   int last_E2lane_base_;
 
-  vector<int> left_coef_;
-  Mat right_coef_;
-  Mat extra_coef_;
-  Mat extra2_coef_;
-  Mat center_coef_;
-  Mat center2_coef_;
-  Mat center3_coef_;
   float left_curve_radius_;
   float right_curve_radius_;
   float center_position_;
@@ -190,6 +173,15 @@ private:
   vector<float> e_values_;
   float target_x_;
   float target_y_;
+
+  vector<int> left_lane_inds_;
+  vector<int> right_lane_inds_;
+  vector<int> left_x_;
+  vector<int> left_y_;
+  vector<int> right_x_;
+  vector<int> right_y_;
+  vector<int> center_x_;
+  vector<int> center_y_;
 
   /********** PID control ***********/
   int prev_lane_, prev_pid_;

@@ -148,7 +148,7 @@ void LaneKeeping::controlSteer(Mat left, Mat right, Mat center) {
 
     SteerAngle_ = ((-1.0f * K1_) * e_values_[1]) + ((-1.0f * K2_) * e_values_[0]);
     steer_.data = SteerAngle_;
-    cout << SteerAngle_  << '\n';
+//    cout << SteerAngle_  << '\n';
   } 
  }
 
